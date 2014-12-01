@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source "${BASH_SOURCE[0]%/*}"/utils.bash
+
 # git rev-parse will bail on the first `@{-1}` syntax that refers to a deleted branch.
 # So we need to repeatedly invoke it for each branch.
 
@@ -9,27 +11,6 @@ usage() {
     echo "  --limit|-l N"
     echo "      Limits the branch history to N previous branches"
     echo "      (default 10)"
-}
-
-die() {
-    code=1
-    (( $# > 1 )) && { code=$1; shift; }
-    (( $# > 0 )) && { printf 'error: '; printf '%s\n' "$@"; } >&2
-    exit "$code"
-}
-
-color() {
-    local suppressNewline=
-    if [[ $1 == -n ]]; then
-        suppressNewline=yes
-        shift
-    fi
-
-    local name=${1:+color.branch."$1"} fallback=$2 text=$3
-    [[ -t 1 ]] && git config --get-color "$name" "$fallback"
-    printf '%s' "$text"
-    [[ -t 1 ]] && git config --get-color '' reset
-    [[ -z $suppressNewline ]] && printf '\n'
 }
 
 limit=10
@@ -65,33 +46,26 @@ done
 git rev-parse --git-dir >/dev/null || exit
 
 HEAD=($(git -c core.warnAmbiguousRefs=false rev-parse HEAD --symbolic-full-name HEAD))
-git config --get-colorbool color.branch
-useColor=$(( ! $? ))
 
 for (( i=1; i <= limit; i++ )); do
     printf '@{-%d}: ' "$i"
     if branch=($(git rev-parse "@{-$i}" --symbolic-full-name "@{-$i}" --abbrev-ref "@{-$i}" 2>/dev/null)); then
         if [[ -n ${branch[1]} ]]; then
-            if (( useColor )); then
-                if [[ ${HEAD[1]} == "${branch[1]}" ]]; then
-                    git config --get-color color.branch.current green
-                else
-                    git config --get-color color.branch.local normal
-                fi
+            config=local color=normal
+            if [[ ${HEAD[1]} == "${branch[1]}" ]]; then
+                config=current color=green
             fi
-            printf '%s' "${branch[2]}"
+            color -b color.branch -c color.branch."$config" "$color" "${branch[2]}" reset
         else
+            config=plain color=normal
             if [[ ${HEAD[1]} == HEAD && ${branch[0]} == "${HEAD[0]}" ]]; then
+                config=current color=green
                 (( useColor )) && git config --get-color color.branch.current green
-            else
-                (( useColor )) && git config --get-color color.branch.plain normal
             fi
-            printf '(detached from %s)' "$(git rev-parse --short "${branch[0]}")"
+            msg="(detached from $(git rev-parse --short "${branch[0]}"))"
+            color -b color.branch -c color.branch"$config" "$color" "$msg" reset
         fi
     else
-        (( useColor )) && git config --get-color '' red
-        printf '(deleted branch)'
+        color -b color.branch red '(deleted branch)' reset
     fi
-    (( useColor )) && git config --get-color '' reset
-    printf '\n'
 done
