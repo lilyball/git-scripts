@@ -1,0 +1,56 @@
+#!/bin/bash
+
+usage() {
+    echo "usage: git rebase-noninteractive COMMIT"
+}
+
+editor=no
+
+while (( $# > 0 )); do
+    case "$1" in
+        -h|--help)
+            usage
+            exit
+            ;;
+        --editor)
+            editor=yes
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            echo "unknown flag $1" >&2
+            usage >&2
+            exit 1
+            ;;
+        *)
+            break
+    esac
+    shift
+done
+
+if [[ $editor = yes ]]; then
+    # editor mode, verify that we have at least one fixup/squash command
+    good=no
+    while read -r LINE; do
+        if [[ "$LINE" == "fixup " || "$LINE" == "squash " ]]; then
+            good=yes
+        fi
+        printf "%s\n" "$LINE"
+    done
+    if [[ $good = no ]]; then
+        echo "No fixup/squash instructions found; is the commit correct?" >&2
+        exit 1
+    fi
+    exit 0
+fi
+
+if (( $# != 1 )); then
+    usage >&2
+    exit 1
+fi
+
+commit=$1
+
+exec git -c core.editor='git-rebase-noninteractive --editor' rebase -i "$commit"

@@ -1,0 +1,138 @@
+#!/bin/bash
+
+usage() {
+    echo "usage: git close-current-branch [MAINLINE]"
+}
+
+die() {
+    local code=1
+    if (( $# > 1 )); then
+        code=$1
+        shift
+    fi
+    (( $# > 0 )) && printf "%s\n" "$1" >&2
+    exit "$code"
+}
+
+set_color() {
+    test -t 1 || return 0
+    case "$1" in
+        reset)
+            tput sgr0;;
+        black)
+            tput 0;;
+        red)
+            tput 1;;
+        green)
+            tput 2;;
+        yellow)
+            tput 3;;
+        blue)
+            tput 4;;
+        magenta|purple)
+            tput 5;;
+        cyan)
+            tput 6;;
+        white)
+            tput 7;;
+        *)
+            echo "set_color: unkown color '$1'" >&2
+            return 1
+    esac
+}
+
+detectMainline() {
+    local branch
+    if ! branch=$(git config --get close-current-branch.mainline); then
+        echo "warning: no mainline provided, assuming 'develop'" >&2
+        echo "note: set config value close-current-branch.mainline to suppress this warning" >&2
+        branch=develop
+    fi
+    printf "%s\n" "$branch"
+}
+
+while (( $# > 0 )); do
+    case "$1" in
+        -h|--help)
+            usage
+            exit
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            echo "unknown flag $1" >&2
+            usage >&2
+            exit 1
+            ;;
+        *)
+            break
+            ;;
+    esac
+    shift
+done
+
+mainline=$1
+if (( $# > 1 )); then
+    echo "expected at most 1 parameter, found $#" >&2
+    usage >&2
+    exit 2
+fi
+
+git rev-parse --git-dir >/dev/null || exit
+
+if test -z "$mainline"; then
+    mainline=$(detectMainline) || exit
+fi
+mainline=$(git rev-parse --revs-only --symbolic-full-name "$mainline" --) || exit
+test -n "$mainline" || die "error: unknown branch '$mainline'"
+
+HEAD=$(git rev-parse --revs-only --symbolic-full-name HEAD --) || exit
+test "$HEAD" != "HEAD" || die "error: detached HEAD"
+HEADcommit=
+eval "$(git for-each-ref --count=1 --shell --format='
+    HEADname=%(refname:short)
+    HEADcommit=%(objectname)
+    HEADupstream=%(upstream)
+    HEADupstreamname=%(upstream:short)
+' -- "$HEAD")"
+test -n "$HEADcommit" || die 3 "error: couldn't find ref information for HEAD ($HEAD)"
+
+ref=
+eval "$(git for-each-ref --count=1 --shell --format='
+    ref=%(refname)
+    refname=%(refname:short)
+    commit=%(objectname)
+    upstream=%(upstream)
+    upstreamname=%(upstream:short)
+' -- "$mainline")"
+test -n "$ref" || die "error: no such branch '$mainline'"
+test "$ref" != "$HEAD" || die "error: $refname is currently checked out"
+
+if ! git merge-base --is-ancestor "$HEADcommit" "$commit"; then
+    # mainline does not contain our branch
+    test -n "$upstream" || die "error: $refname does not contain HEAD"
+
+    upstreamcommit=$(git rev-parse --verify "$upstream") || exit
+    git merge-base --is-ancestor "$HEADcommit" "$upstreamcommit" ||
+        die "error: neither $refname nor $upstreamname contain HEAD"
+
+    # but upstream of mainline does
+    echo "Updating mainline $refname with $upstreamname..."
+
+    git merge-base --is-ancestor "$commit" "$upstreamcommit" ||
+        die "error: $refname contains commits not found in $upstreamname"
+
+    git update-ref -m "git close-current-branch" "$ref" "$upstreamcommit" "$commit" || exit
+fi
+
+echo "Checking out $refname..."
+git checkout "$refname" || exit
+
+echo "Deleting $HEADname..."
+git update-ref -m "git close-current-branch" -d "$HEAD" "$HEADcommit" || exit
+
+if test -n "$HEADupstream" && git rev-parse --quiet --verify "$HEADupstream" >/dev/null; then
+    echo "warning: upstream $HEADupstreamname still exists" >&2
+fi

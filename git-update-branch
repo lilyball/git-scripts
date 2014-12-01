@@ -1,0 +1,31 @@
+#!/bin/bash
+
+usage() {
+    echo "usage: git update-branch BRANCH"
+}
+
+if (( $# != 1 )); then
+    usage >&2
+    exit 2
+fi
+
+branch=$1
+
+if [[ "$branch" == -h || "$branch" == --help ]]; then
+    usage >&2
+    exit
+elif [[ "$branch" == -* ]]; then
+    echo "error: branch cannot start with -" >&2
+    usage >&2
+    exit 1
+elif ! git rev-parse --verify "$branch" >/dev/null 2>&1; then
+    usage >&2
+    exit 1
+fi
+
+if ! git rev-parse --verify "$branch@{upstream}" >/dev/null 2>&1; then
+    echo "error: no upstream available for '$branch'" >&2
+    exit 1
+fi
+
+exec git push . +"$branch@{upstream}:$branch"

@@ -1,0 +1,66 @@
+#!/bin/bash
+
+die() {
+    echo "$@" >&2
+    exit 1
+}
+
+usage() {
+    echo "usage: git find-merge [-o | --oneline] [-a | --all] COMMIT [BRANCH]"
+}
+
+format=
+all=no
+
+while (( $# != 0 )); do
+    case "$1" in
+        -o|--oneline)
+            format=oneline
+            ;;
+        -a|--all)
+            all=yes
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            die "$(printf "unknown flag: %s\n%s\n" "$1" "$(usage)")"
+            ;;
+        *)
+            break
+            ;;
+    esac
+    shift
+done
+
+commit=$1
+shift || die "$(usage)"
+branch=${1:-HEAD}
+shift # branch is optional
+shift && die "$(usage)" # too many args
+
+[[ "$commit" == -* ]] && die "bad revision '$commit'"
+[[ "$branch" == -* ]] && die "bad branch '$branch'"
+
+revs=$(git rev-list --ancestry-path --topo-order --format=%P "$branch" --not "$commit" --) \
+    || die 'command `git rev-list` failed'
+
+merge=
+parent=
+while read -r word sha && [[ "$word" == commit ]]; do
+    if ! [[ -z "$parent" || "$parent" == "$sha" ]]; then
+        read -r _ # skip next line
+        continue
+    fi
+    read -r parent parent2 && [[ -n "$parent" ]] || die "invalid rev-list output"
+    if [[ -n "$parent2" ]]; then
+        merge=$sha
+    else
+        merge=
+    fi
+done <<<"$revs"
+
+[[ -n "$merge" ]] || die "Couldn't find any merge point"
+
+exec git --no-pager log --max-count=1 ${format:+--format="$format"} "$merge" --

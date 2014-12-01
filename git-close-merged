@@ -1,0 +1,138 @@
+#!/bin/bash
+
+. "${BASH_SOURCE[0]%/*}"/utils.bash
+
+usage() {
+    echo "git close-merged [-f] [-n] [MAINLINE]"
+    echo " -f     Close local branches even if upstream exists"
+    echo " -n     Dry run; do not actually delete any branches"
+}
+
+force=
+dry_run=
+
+while (( $# > 0 )); do
+    case "$1" in
+        -h|--help)
+            usage
+            exit
+            ;;
+        -f|--force)
+            force=yes
+            ;;
+        -n|--dry-run)
+            dry_run=yes
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            echo "unknown flag $1" &2
+            usage >&2
+            exit 1
+            ;;
+        *)
+            break
+            ;;
+    esac
+    shift
+done
+
+mainline=${1-HEAD}
+[[ -n $mainline ]] || die 2 "mainline branch cannot be ''" "$(usage)"
+(( $# <= 1 )) || die 2 "expected at most 1 parameter, found $#" "$(usage)"
+
+git rev-parse --git-dir >/dev/null || exit
+
+mainline=$(git rev-parse --revs-only --symbolic-full-name "$mainline" --) || exit
+[[ -n $mainline ]] || die "unknown branch '$mainline'"
+
+mainlinecommit=
+mainlineupstreamcommit=
+eval "$(git for-each-ref --count=1 --shell --format='
+    mainlinename=%(refname:short)
+    mainlinecommit=%(objectname)
+    mainlineupstream=%(upstream)
+    mainlineupstreamname=%(upstream:short)
+' -- "$mainline")"
+[[ -n $mainlinecommit ]] || die 3 "couldn't find ref information for mainline ($mainline)"
+if [[ -n $mainlineupstream ]]; then
+    if ! mainlineupstreamcommit=$(git rev-parse --verify "$mainlineupstream"); then
+        mainlineupstream=
+    fi
+fi
+
+result=0
+process_ref() {
+    local ref=$1 refname=$2 commit=$3
+    local upstream=$4 upstreamname=$5 upstreamcommit=
+    local ishead=$6
+
+    local notes=()
+
+    local skip=
+    if [[ $ref == "$mainline" ]]; then
+        skip="mainline"
+    elif [[ $ishead == '*' ]]; then
+        skip="currently checked out"
+    elif ! git merge-base --is-ancestor "$commit" "$mainlinecommit"; then
+        if [[ -n $mainlineupstream ]] && git merge-base --is-ancestor "$commit" "$mainlineupstreamcommit"; then
+            local flags=
+            test -t 1 && flags=-f
+            notes+=("$(color $flags reset "branch is merged into mainline upstream " cyan "$mainlineupstreamname" reset)")
+        else
+            skip="contains unmerged commits"
+        fi
+    fi
+    if [[ -n $skip ]]; then
+        color green "Skipping" reset " " cyan "$refname" reset " ($skip)"
+        return
+    fi
+
+    if [[ -n $upstream ]] && ! upstreamcommit=$(git rev-parse --quiet --verify "$upstream"); then
+        upstream=
+    fi
+
+    color -n magenta "Deleting" reset " " cyan "$refname" reset "... "
+    if [[ -n $upstream ]]; then
+        if [[ -z $force ]]; then
+            color yellow "abort" reset
+            color yellow "warning:" reset " upstream " cyan "$upstreamname" reset " still exists, pass -f to force"
+            return
+        fi
+        if ! git merge-base --is-ancestor "$commit" "$upstreamcommit"; then
+            color yellow "abort" reset
+            color red "warning:" reset " branch " cyan "$refname" reset " contains commits not found in upstream " cyan "$upstreamname" reset
+            return
+        fi
+    fi
+
+    local output
+    # shellcheck disable=SC2069
+    if [[ -n $dry_run ]] || output=$(git update-ref -m 'git close-merged' -d "$ref" "$commit" 2>&1 >/dev/null); then
+        if [[ -n $dry_run ]]; then
+            color yellow "dry run" reset
+        else
+            color green "ok" reset
+        fi
+        local note
+        for note in "${notes[@]}"; do
+            color yellow "note:" reset " $note"
+        done
+    else
+        color red "fail" reset
+        color red "error:" reset " $output"
+        result=1
+    fi
+}
+
+eval "$(git for-each-ref --shell --format='
+    process_ref %(refname) %(refname:short) %(objectname) %(upstream) %(upstream:short) %(HEAD)
+' -- refs/heads)"
+
+if [[ $result == 0 ]]; then
+    echo "All merged branches have been closed"
+else
+    exit $result
+fi

@@ -1,0 +1,122 @@
+#!/bin/bash
+
+# Usage: git find-tree [options] [<tree-ish>] <path>
+#
+# Options:
+#     -c, --combined
+#     -a, --all
+#     -s, --include-submodules
+#
+# Finds the path to <path> within <tree-ish>, or HEAD if unspecified.
+# The <path> may contain glob characters. Note that / is matched by glob
+# characters.
+#
+# If --combined is specified, the output is <tree-ish>:<full path>. Otherwise
+# the output is a path relative to the current working dir. Only one path is
+# ever emitted, unless --all is specified.
+#
+# If --include-submodules is specified, submodules are searched as well.
+# --include-submodules is ignored if --combined is specified.
+#
+# If no path matches, the command returns with an exit code 1.
+
+function usage () {
+	echo "usage: git find-tree [options] [<tree-ish>] <path>" >&2
+	echo "" >&2
+	echo "Options:" >&2
+	echo "    -c, --combined" >&2
+	echo "    -a, --all" >&2
+	echo "    -s, --include-submodules" >&2
+	return 2
+}
+
+declare combined=no
+declare all=no
+declare incsub=no
+while true; do
+	case "$1" in
+		-c|--combined) combined=yes; shift;;
+		-a|--all) all=yes; shift;;
+		-s|--include-submodules) incsub=yes; shift;;
+		-h|--help) usage; exit 0;;
+		-*) usage; exit;;
+		*) break;;
+	esac
+done
+
+if [[ "$combined" == yes && "$incsub" == yes ]]; then
+	incsub=no
+fi
+
+declare treeish=HEAD
+declare path
+case $# in
+	1) path=$1;;
+	2) treeish=$1; path=$2;;
+	*) usage; exit;;
+esac
+
+if [[ "$path" == "" ]]; then
+	usage; exit;
+fi
+if [[ "$treeish" == "" ]]; then
+	usage; exit;
+fi
+
+# git ls-tree has a bug (in git v1.8.4.2) wherein the -t flag
+# causes the command to output nothing if executed from a subdirectory.
+# Passing --full-name or --full-tree fixes this issue,
+# but we need to do the filtering ourselves.
+declare flags="-r -t --full-name"
+
+declare prefix
+prefix=$(git rev-parse --show-prefix)
+(( $? == 0 )) || exit
+declare out_prefix=
+
+if [[ "$combined" == yes ]]; then
+	out_prefix=$(git rev-parse --short $treeish 2>/dev/null):${prefix:+./}
+fi
+
+declare -i found=0
+declare git_dir # separate commands so $? works
+git_dir=$(git rev-parse --git-dir)
+(( $? == 0 )) || exit
+
+searchTree() {
+	local flags=$1
+	local treeish=$2
+	local git_dir=$3
+	local submod=$4
+	local submod_path=${5:+${5%/}/}
+	local prefix=$prefix
+	declare -a gitflags
+	if [[ -n "$submod" ]]; then
+		prefix=
+		git_dir+=/modules/$submod
+		gitflags+=(--git-dir "$git_dir")
+	fi
+	local mode typ obj file
+	local output
+	output=$(git "${gitflags[@]}" ls-tree $flags $treeish)
+	(( $? == 0 )) || return
+	while read -r mode typ obj file; do
+		file=${file:${#prefix}}
+		case "$file" in
+			*/$path|$path)
+				echo "$out_prefix$submod_path$file"
+				if [[ "$all" != yes ]]; then return; fi
+				found+=1
+				;;
+		esac
+		if [[ "$incsub" == yes && "$typ" == commit ]]; then
+			searchTree "$flags" "$obj" "$git_dir" "$prefix$file" "$submod_path$file" || return
+			[[ $all == yes || (( found == 0 )) ]] || return
+		fi
+	done <<<"$output"
+}
+
+searchTree "$flags" "$treeish" "$git_dir" || exit
+if (( found == 0 )); then
+	exit 1
+fi
