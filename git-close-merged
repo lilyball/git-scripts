@@ -3,13 +3,19 @@
 . "${BASH_SOURCE[0]%/*}"/utils.bash
 
 usage() {
-    echo "git close-merged [-f] [-n] [MAINLINE]"
-    echo " -f     Close local branches even if upstream exists"
-    echo " -n     Dry run; do not actually delete any branches"
+    echo "Usage: git close-merged [-f] [-u] [-n] [MAINLINE]"
+    echo ""
+    echo "-f --force     Close local branches even if upstream exists."
+    echo "-u --upstream  Delete upstream branches if necessary."
+    echo "               Note: you must pass -f as well to actually delete it,"
+    echo "               otherwise it will only report whether it would have deleted"
+    echo "               the branch."
+    echo "-n --dry-run   Dry run; do not actually delete any branches."
 }
 
-force=
-dry_run=
+opt_force=
+opt_upstream=
+opt_dry_run=
 
 while (( $# > 0 )); do
     case "$1" in
@@ -18,10 +24,13 @@ while (( $# > 0 )); do
             exit
             ;;
         -f|--force)
-            force=yes
+            opt_force=yes
+            ;;
+        -u|--upstream)
+            opt_upstream=yes
             ;;
         -n|--dry-run)
-            dry_run=yes
+            opt_dry_run=yes
             ;;
         --)
             shift
@@ -38,6 +47,9 @@ while (( $# > 0 )); do
     esac
     shift
 done
+
+test -t 1
+test -t 1 && colorFlags=-f || colorFlags=
 
 mainline=${1-HEAD}
 [[ -n $mainline ]] || die 2 "mainline branch cannot be ''" "$(usage)"
@@ -70,6 +82,11 @@ process_ref() {
     local ishead=$6
 
     local notes=()
+    local output=
+    local remote= remoteref=
+
+    local colorFlags=
+    test -t 1 && colorFlags=-f
 
     local skip=
     if [[ $ref == "$mainline" ]]; then
@@ -78,9 +95,7 @@ process_ref() {
         skip="currently checked out"
     elif ! git merge-base --is-ancestor "$commit" "$mainlinecommit"; then
         if [[ -n $mainlineupstream ]] && git merge-base --is-ancestor "$commit" "$mainlineupstreamcommit"; then
-            local flags=
-            test -t 1 && flags=-f
-            notes+=("$(color $flags reset "branch is merged into mainline upstream " cyan "$mainlineupstreamname" reset)")
+            notes+=("$(color $colorFlags reset "branch is merged into mainline upstream " cyan "$mainlineupstreamname" reset)")
         else
             skip="contains unmerged commits"
         fi
@@ -96,33 +111,70 @@ process_ref() {
 
     color -n magenta "Deleting" reset " " cyan "$refname" reset "... "
     if [[ -n $upstream ]]; then
-        if [[ -z $force ]]; then
-            color yellow "abort" reset
-            color yellow "warning:" reset " upstream " cyan "$upstreamname" reset " still exists, pass -f to force"
-            return
-        fi
         if ! git merge-base --is-ancestor "$commit" "$upstreamcommit"; then
             color yellow "abort" reset
-            color red "warning:" reset " branch " cyan "$refname" reset " contains commits not found in upstream " cyan "$upstreamname" reset
+            color yellow "warning:" reset " branch " cyan "$refname" reset " contains commits not found in upstream " cyan "$upstreamname" reset
             return
         fi
+        if [[ -n $opt_upstream ]]; then
+            if ! git merge-base --is-ancestor "$upstreamcommit" "$mainlinecommit"; then
+                color yellow "abort" reset
+                color yellow "warning:" reset " upstream " cyan "$upstreamname" reset " contains unmerged commits"
+                return
+            fi
+            # the remote used for the tracking branch comes from the config
+            # branch.<branch>.remote.
+            # Similarly the remote refspec is branch.<branch>.merge.
+            # Our $upstream is the local remote-tracking branch, but the name may
+            # differ from the remote refspec.
+            if ! remote=$(git config --get branch."$refname".remote 2>/dev/null) \
+                 remoteref=$(git config --get branch."$refname".merge 2>/dev/null); then
+                # we got an upstream before but can't manually retrieve it now?
+                color red "fail" reset
+                color red "error:" reset " failed to retrieve upstream branch information"
+                return
+            fi
+            if [[ -n $opt_force ]]; then
+                local output=
+                if [[ -n $opt_dry_run ]] || output=$(git push --delete --force-with-lease="$remoteref":"$upstreamcommit" "$remote" "$remoteref" 2>&1); then
+                    notes+=("$(color $colorFlags reset "deleted upstream " cyan "$upstreamname" reset)")
+                    [[ -n $output ]] && notes+=("$output")
+                else
+                    color red "fail" reset
+                    color red "error:" reset " error deleting upstream " cyan "$upstreamname" reset
+                    print_lines -h output -c yellow "$output"
+                    result=1
+                    return
+                fi
+            else
+                color yellow "abort" reset
+                color yellow "warning:" reset " pass -f to delete upstream " cyan "$upstreamname" reset
+                return
+            fi
+        else
+            color yellow "abort" reset
+            color yellow "warning:" reset " upstream " cyan "$upstreamname" reset " still exists"
+            echo "         pass -u to delete upstream or -f to force"
+            return
+        fi
+
     fi
 
-    local output
     # shellcheck disable=SC2069
-    if [[ -n $dry_run ]] || output=$(git update-ref -m 'git close-merged' -d "$ref" "$commit" 2>&1 >/dev/null); then
-        if [[ -n $dry_run ]]; then
+    local output=
+    if [[ -n $opt_dry_run ]] || output=$(git update-ref -m 'git close-merged' -d "$ref" "$commit" 2>&1 >/dev/null); then
+        if [[ -n $opt_dry_run ]]; then
             color yellow "dry run" reset
         else
             color green "ok" reset
         fi
-        local note
         for note in "${notes[@]}"; do
-            color yellow "note:" reset " $note"
+            print_lines -h note -c yellow "$note"
         done
     else
         color red "fail" reset
-        color red "error:" reset " $output"
+        color red "error: " reset " error closing branch " cyan "$refname" reset
+        print_lines -h output -c yellow "$output"
         result=1
     fi
 }
@@ -132,6 +184,9 @@ eval "$(git for-each-ref --shell --format='
 ' -- refs/heads)"
 
 if [[ $result == 0 ]]; then
+    if [[ -n $opt_dry_run ]]; then
+        echo -n '[dry run] '
+    fi
     echo "All merged branches have been closed"
 else
     exit $result
