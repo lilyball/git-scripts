@@ -35,3 +35,8 @@ the remote branch deleted. See `git close-current-branch --help` for details.
 Closes all local branches that have been merged into HEAD (or a specified
 branch). This command is upstream-aware, and can be instructed to close remote
 branches as well. See `git close-merged --help` for details.
+
+## `git-dirs`
+
+Prints a list of the most recently checked-out branches. See `git dirs --help`
+for details.
