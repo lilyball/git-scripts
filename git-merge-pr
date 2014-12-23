@@ -1,0 +1,104 @@
+#!/bin/bash
+
+. "${BASH_SOURCE[0]%/*}"/utils.bash
+
+shopt -s extglob
+
+usage() {
+    echo "Usage: git merge-pr URL"
+    echo
+    echo "Options:"
+    echo "  -h --help     Displays this help."
+    echo "  -E --no-edit  Accept the default merge message."
+    echo
+    echo "Arguments:"
+    echo "  URL  The pull-request URL to merge."
+    [[ -z $1 ]] && return
+    echo
+    echo "Description:"
+    echo "  Merges a GitHub pull-request, preserving the title and description the same"
+    echo "  way the Merge button on GitHub does."
+    echo
+    echo "  Requires jq (\`brew install jq\`)."
+}
+
+api_url_for_pr() {
+    local url=$1
+    local pr=
+    local pat='https?://(www\.)?github\.com/([^/]+)/([^/]+)'
+    if [[ $url =~ '#'([[:digit:]]+) ]]; then
+        # PR number with optional leading "#"
+        # Use the 'origin' remote
+        pr=${BASH_REMATCH[1]}
+        if ! url=git config --get remote.origin.url; then
+            echo "error: could not find url for remote 'origin'" >&2
+            return 1
+        fi
+    else
+        pat+='/pull/([[:digit:]]+)(\.patch|\.diff)?'
+    fi
+    if [[ ! $url =~ ^$pat$ ]]; then
+        echo "error: unsupported URL" >&2
+        return 1
+    fi
+    local user=${BASH_REMATCH[2]} repo=${BASH_REMATCH[3]}
+    [[ -z $pr ]] && pr=${BASH_REMATCH[4]}
+    printf 'https://api.github.com/repos/%s/%s/pulls/%d\n' "$user" "$repo" "$pr"
+}
+
+fix_line_endings() {
+    printf '%s\n' "${1//$'\r'?($'\n')/$'\n'}"
+}
+
+# defines PR_NUM, PR_TITLE, PR_BODY, PR_OWNER, PR_REF, PR_CLONE_URL
+get_pullreq_info() {
+    local url=$1
+    url=$(api_url_for_pr "$url") || die
+    local json
+    json=$(curl -s -S "$url") || return
+    local jq='[.number, .title, .body, .head.repo.owner.login, .head.ref, .head.repo.clone_url] | map(. // "") | @sh'
+    local output
+    output=$(jq -r -e "$jq" <<<"$json") || return
+    eval "set -- $output" || return
+    PR_NUM=$1
+    PR_TITLE=$(fix_line_endings "$2")
+    PR_BODY=$(fix_line_endings "$3")
+    PR_OWNER=$4
+    PR_REF=$5
+    PR_CLONE_URL=$6
+}
+
+opt_edit=yes
+while (( $# > 0 )); do
+    case $1 in
+        -h|--help)
+            usage full
+            exit
+            ;;
+        -E|--no-edit)
+            opt_edit=
+            ;;
+        -*)
+            die 2 "unknown flag $1" "$(usage)"
+            ;;
+        *)
+            break
+    esac
+    shift
+done
+
+URL=$1
+shift
+[[ -z $URL ]] && die 2 "expected URL" "$(usage)"
+(( $# == 0 )) || die 2 "$(printf 'unknown parameter %q' "$1")" "$(usage)"
+
+command -v jq >/dev/null || die "missing dependency 'jq'"
+
+get_pullreq_info "$URL" || die "error fetching PR info"
+
+message="Merge pull request #$PR_NUM from $PR_OWNER/$PR_REF"
+[[ -n $PR_TITLE ]] && message+=$'\n\n'"$PR_TITLE"
+[[ -n $PR_BODY ]] && message+=$'\n\n'"$PR_BODY"
+
+git fetch "$PR_CLONE_URL" "$PR_REF" || die "fetch failed"
+git merge --no-ff -m "$message" ${opt_edit:+--edit} --no-log FETCH_HEAD || die "merge failed"

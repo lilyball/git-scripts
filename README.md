@@ -60,6 +60,13 @@ for details.
 
 [vim-fugitive]: https://github.com/tpope/vim-fugitive
 
+### `git-merge-pr`
+
+Merges a GitHub pull request locally using the pull request title and
+description. Requires [`jq`][jq]. See `git merge-pr -h` for details.
+
+[jq]: http://stedolan.github.io/jq/
+
 ### `git-noninteractive`
 
 This is a work in progress. I don't think it works at the moment.
