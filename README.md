@@ -40,3 +40,9 @@ branches as well. See `git close-merged --help` for details.
 
 Prints a list of the most recently checked-out branches. See `git dirs --help`
 for details.
+
+## `git-find-merge`
+
+Finds the oldest merge in the first-parent history of a given branch that a
+given commit is reachable from. This can be said to be the merge that introduced
+a commit into a given branch. See `git find-merge --help` for details.
