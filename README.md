@@ -52,3 +52,10 @@ a commit into a given branch. See `git find-merge --help` for details.
 Finds the full path to a given filename path in a given tree-ish. This may
 optionally produce output that refers to the file's blob, for use with other git
 commands. See `git find-tree --help` for details.
+
+## `git-fugitive`
+
+Displays a given revision or file in [vim-fugitive][]. See `git fugitive --help`
+for details.
+
+[vim-fugitive]: https://github.com/tpope/vim-fugitive
