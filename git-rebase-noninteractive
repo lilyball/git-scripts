@@ -1,7 +1,21 @@
 #!/bin/bash
 
 usage() {
-    echo "usage: git rebase-noninteractive COMMIT"
+    echo "Usage: git rebase-noninteractive COMMIT"
+    echo
+    echo "Options:"
+    echo "  -h --help  Displays this help."
+    echo
+    echo "Arguments:"
+    echo "  COMMIT  The commit to use as the upstream"
+    [[ -z $1 ]] && return
+    echo
+    echo "Description:"
+    echo "  Performs an interactive git rebase without the interactivity."
+    echo "  Intended usage is to clean up fixup! / squash! commits."
+    echo
+    echo "Note:"
+    echo "  This is still a work in progress. Do not expect it to work."
 }
 
 editor=no
@@ -9,7 +23,7 @@ editor=no
 while (( $# > 0 )); do
     case "$1" in
         -h|--help)
-            usage
+            usage full
             exit
             ;;
         --editor)

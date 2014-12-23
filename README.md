@@ -59,3 +59,7 @@ Displays a given revision or file in [vim-fugitive][]. See `git fugitive -h`
 for details.
 
 [vim-fugitive]: https://github.com/tpope/vim-fugitive
+
+## `git-noninteractive`
+
+This is a work in progress. I don't think it works at the moment.
