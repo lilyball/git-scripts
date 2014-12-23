@@ -29,3 +29,9 @@ should respond to the `--help` flag with its expected parameters and options.
 Closes the current branch if it's been merged into the mainline. Intended usage
 is after a pull request for the current branch has been merged into mainline and
 the remote branch deleted. See `git close-current-branch --help` for details.
+
+## `git-close-merged`
+
+Closes all local branches that have been merged into HEAD (or a specified
+branch). This command is upstream-aware, and can be instructed to close remote
+branches as well. See `git close-merged --help` for details.

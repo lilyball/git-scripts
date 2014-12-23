@@ -4,13 +4,23 @@
 
 usage() {
     echo "Usage: git close-merged [-f] [-u] [-n] [MAINLINE]"
-    echo ""
-    echo "-f --force     Close local branches even if upstream exists."
-    echo "-u --upstream  Delete upstream branches if necessary."
-    echo "               Note: you must pass -f as well to actually delete it,"
-    echo "               otherwise it will only report whether it would have deleted"
-    echo "               the branch."
-    echo "-n --dry-run   Dry run; do not actually delete any branches."
+    echo
+    echo "Options:"
+    echo "  -h --help      Displays this help."
+    echo "  -f --force     Close local branches even if upstream exists."
+    echo "  -u --upstream  Delete upstream branches if necessary."
+    echo "                 Note: you must pass -f as well to actually delete it,"
+    echo "                 otherwise it will only report whether it would have deleted"
+    echo "                 the branch."
+    echo "  -n --dry-run   Dry run; do not actually delete any branches."
+    echo
+    echo "Arguments:"
+    echo "  MAINLINE  The mainline branch. [default: HEAD]"
+    [[ -z $1 ]] && return
+    echo
+    echo "Description:"
+    echo "  Closes all local branches that have been merged into MAINLINE, or into"
+    echo "  MAINLINE's upstream branch (if set)."
 }
 
 opt_force=
@@ -20,7 +30,7 @@ opt_dry_run=
 while (( $# > 0 )); do
     case "$1" in
         -h|--help)
-            usage
+            usage full
             exit
             ;;
         -f|--force)
@@ -37,7 +47,7 @@ while (( $# > 0 )); do
             break
             ;;
         -*)
-            echo "unknown flag $1" &2
+            echo "unknown flag $1" >&2
             usage >&2
             exit 1
             ;;
