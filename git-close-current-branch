@@ -1,7 +1,22 @@
 #!/bin/bash
 
 usage() {
-    echo "usage: git close-current-branch [MAINLINE]"
+    echo "Usage: git close-current-branch [MAINLINE]"
+    echo
+    echo "Options:"
+    echo "  -h --help  Displays this help."
+    [[ -z $1 ]] && return
+    echo
+    echo "Description:"
+    echo "  Closes the current branch if it's been merged into the mainline."
+    echo "  The config key close-current-branch.mainline defines the default mainline"
+    echo "  if not given as an argument, with 'develop' as the default if unset."
+    echo
+    echo "  This script is intended to be used after a pull request is merged and the"
+    echo "  remote branch is closed."
+    echo
+    echo "Example:"
+    echo "  > git fetch && git close-current-branch"
 }
 
 die() {
@@ -54,7 +69,7 @@ detectMainline() {
 while (( $# > 0 )); do
     case "$1" in
         -h|--help)
-            usage
+            usage full
             exit
             ;;
         --)
