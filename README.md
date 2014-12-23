@@ -46,3 +46,9 @@ for details.
 Finds the oldest merge in the first-parent history of a given branch that a
 given commit is reachable from. This can be said to be the merge that introduced
 a commit into a given branch. See `git find-merge --help` for details.
+
+## `git-find-tree`
+
+Finds the full path to a given filename path in a given tree-ish. This may
+optionally produce output that refers to the file's blob, for use with other git
+commands. See `git find-tree --help` for details.
