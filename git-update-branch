@@ -1,24 +1,55 @@
 #!/bin/bash
 
 usage() {
-    echo "usage: git update-branch BRANCH"
+    echo "Usage: git update-branch BRANCH"
+    echo
+    echo "Options:"
+    echo "  -h --help  Displays this help."
+    echo
+    echo "Arguments:"
+    echo "  BRANCH  The branch to update."
+    [[ -z $1 ]] && return
+    echo
+    echo "Description:"
+    echo "  Updates a given branch to match its upstream."
+    echo
+    echo "  This is effectively just a more convenient alternative to using"
+    echo "  $ git push . +branch@{upstream}:branch"
+    echo
+    echo "  Warning: this does a force-push and may therefore lose any commits on the"
+    echo "  local branch that haven't been pushed to the remote branch."
 }
 
-if (( $# != 1 )); then
+while (( $# > 0 )); do
+    case $1 in
+        -h|--help)
+            usage full
+            exit 0
+            ;;
+        -*)
+            echo "error: unknown flag $1" >&2
+            usage >&2
+            exit 2
+            ;;
+        *)
+            break
+    esac
+done
+
+branch=$1
+shift
+
+if [[ -z $branch ]]; then
+    echo "error: expected branch argument" >&2
+    usage >&2
+    exit 2
+elif (( $# > 0 )); then
+    printf 'error: unexpected argument %q\n' "$1" >&2
     usage >&2
     exit 2
 fi
 
-branch=$1
-
-if [[ "$branch" == -h || "$branch" == --help ]]; then
-    usage >&2
-    exit
-elif [[ "$branch" == -* ]]; then
-    echo "error: branch cannot start with -" >&2
-    usage >&2
-    exit 1
-elif ! git rev-parse --verify "$branch" >/dev/null 2>&1; then
+if ! git rev-parse --verify "$branch" >/dev/null 2>&1; then
     usage >&2
     exit 1
 fi

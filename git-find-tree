@@ -21,13 +21,30 @@
 # If no path matches, the command returns with an exit code 1.
 
 function usage () {
-	echo "usage: git find-tree [options] [<tree-ish>] <path>" >&2
-	echo "" >&2
-	echo "Options:" >&2
-	echo "    -c, --combined" >&2
-	echo "    -a, --all" >&2
-	echo "    -s, --include-submodules" >&2
-	return 2
+	echo "Usage: git find-tree [options] [<tree-ish>] <path>"
+	echo
+	echo "Options:"
+	echo "  -c --combined            Prints a rev-parse string for the blob instead of"
+	echo "                           the relative file path."
+	echo "  -a --all                 Print all matches instead of just the first."
+	echo "  -s --include-submodules  Include submodules in the search."
+	echo "                           This flag is ignored if --combined is given."
+	echo
+	echo "Arguments:"
+	echo "  <tree-ish>  The tree-ish to look for the file in. [default: HEAD]"
+	echo "  <path>      The filename pattern to look for."
+	[[ -z $1 ]] && return
+	echo
+	echo "Description:"
+	echo "  Finds the path to <path> within <tree-ish>. The <path> may contain glob"
+	echo "  characters. Note that / is matched by glob characters."
+	echo
+	echo "  The default output is a path relative to the current working directory."
+	echo "  If --combined is given, the output is '<tree-ish>:<full path>', suitable"
+	echo "  for passing to other git commands."
+	echo
+	echo "  Only a single path is printed, unless --all is given. If no paths are found,"
+	echo "  this script exits with code 1."
 }
 
 declare combined=no
@@ -38,8 +55,8 @@ while true; do
 		-c|--combined) combined=yes; shift;;
 		-a|--all) all=yes; shift;;
 		-s|--include-submodules) incsub=yes; shift;;
-		-h|--help) usage; exit 0;;
-		-*) usage; exit;;
+		-h|--help) usage full; exit 0;;
+		-*) usage >&2; exit 2;;
 		*) break;;
 	esac
 done
@@ -53,14 +70,14 @@ declare path
 case $# in
 	1) path=$1;;
 	2) treeish=$1; path=$2;;
-	*) usage; exit;;
+	*) usage >&2; exit 2;;
 esac
 
 if [[ "$path" == "" ]]; then
-	usage; exit;
+	usage >&2; exit 2;
 fi
 if [[ "$treeish" == "" ]]; then
-	usage; exit;
+	usage >&2; exit 2;
 fi
 
 # git ls-tree has a bug (in git v1.8.4.2) wherein the -t flag

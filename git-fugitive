@@ -4,7 +4,20 @@ set -e
 shopt -s extglob
 
 usage() {
-    echo 'usage: git fugitive-show REV [FILE]'
+    echo "Usage: git fugitive REV [--] [FILE]"
+    echo
+    echo "Options:"
+    echo "  -h --help  Displays this help."
+    echo
+    echo "Arguments:"
+    echo "  REV   The revision to show."
+    echo "  FILE  An optional file to show."
+    [[ -z $1 ]] && return
+    echo
+    echo "Description:"
+    echo "  Displays a given REV or FILE in vim-fugitive."
+    echo
+    echo "  Requires the vim-fugitive plugin to Vim to be installed."
 }
 
 abspath() {
@@ -56,8 +69,32 @@ abspath() {
     printf "%s\n" "$result"
 }
 
+while (( $# > 0 )); do
+    case $1 in
+        -h|--help)
+            usage full
+            exit
+            ;;
+        --)
+            # we don't allow -- before REV
+            echo "error: expected revision" >&2
+            usage >&2
+            exit 2
+            ;;
+        -*)
+            echo "error: unknown flag $1" >&2
+            usage >&2
+            exit 2
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
 REV=$1
 { shift && test -n "$REV"; } || { usage >&2; exit 1; }
+[[ $1 == -- ]] && shift
 FILE=$1
 shift && {
     test -n "$FILE" || { usage >&2; exit 1; }

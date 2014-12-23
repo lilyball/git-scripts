@@ -6,11 +6,17 @@ source "${BASH_SOURCE[0]%/*}"/utils.bash
 # So we need to repeatedly invoke it for each branch.
 
 usage() {
-    echo "git dirs [(-l|--limit) N]"
-    echo ""
-    echo "  --limit|-l N"
-    echo "      Limits the branch history to N previous branches"
-    echo "      (default 10)"
+    echo "Usage: git dirs [(--limit N)]"
+    echo
+    echo "Options:"
+    echo "  -h --help        Displays this help."
+    echo "  -l N, --limit N  Limits the branch history to N previous branches."
+    echo "                   [default: 10]"
+    [[ -z $1 ]] && return
+    echo
+    echo "Description:"
+    echo "  Prints the N most recently checked-out branches."
+    echo "  Branches that have been deleted are displayed as '(deleted branch)'."
 }
 
 limit=10
@@ -25,7 +31,7 @@ while (( $# > 0 )); do
             shift
             ;;
         --help|-h)
-            usage
+            usage full
             exit 0
             ;;
         --)

@@ -6,20 +6,38 @@ die() {
 }
 
 usage() {
-    echo "usage: git find-merge [-o | --oneline] [-a | --all] COMMIT [BRANCH]"
+    echo "Usage: git find-merge [-o] COMMIT [BRANCH]"
+    echo
+    echo "Options:"
+    echo "  -h --help     Displays this help."
+    echo "  -o --oneline  Displays the output as a single line."
+    #echo "  -a --all"
+    echo
+    echo "Arguments:"
+    echo "  COMMIT  The commit to find the merge for."
+    echo "  BRANCH  The branch that COMMIT should be reachable from. [default: HEAD]"
+    [[ -z $1 ]] && return
+    echo
+    echo "Description:"
+    echo "  Finds the oldest merge in the first-parent history of BRANCH that COMMIT"
+    echo "  is reachable from."
 }
 
 format=
-all=no
+#all=no
 
 while (( $# != 0 )); do
     case "$1" in
+        -h|--help)
+            usage full
+            exit 0
+            ;;
         -o|--oneline)
             format=oneline
             ;;
-        -a|--all)
-            all=yes
-            ;;
+        #-a|--all)
+            #all=yes
+            #;;
         --)
             shift
             break
