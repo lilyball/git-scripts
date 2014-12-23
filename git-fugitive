@@ -6,6 +6,9 @@ shopt -s extglob
 usage() {
     echo "Usage: git fugitive REV [--] [FILE]"
     echo
+    echo "Options:"
+    echo "  -h --help  Displays this help."
+    echo
     echo "Arguments:"
     echo "  REV   The revision to show."
     echo "  FILE  An optional file to show."

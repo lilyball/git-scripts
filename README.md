@@ -63,3 +63,8 @@ for details.
 ## `git-noninteractive`
 
 This is a work in progress. I don't think it works at the moment.
+
+## `git-update-branch`
+
+Updates a given branch to match its upstream. See `git update-branch -h` for
+details.
