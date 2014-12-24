@@ -13,15 +13,11 @@ usage() {
     echo "Description:"
     echo "  Performs an interactive git rebase without the interactivity."
     echo "  Intended usage is to clean up fixup! / squash! commits."
-    echo
-    echo "Note:"
-    echo "  This is still a work in progress. Do not expect it to work."
 }
 
-editor=no
-
+opt_editor=
 while (( $# > 0 )); do
-    case "$1" in
+    case $1 in
         -h|--help)
             usage full
             exit
@@ -34,9 +30,9 @@ while (( $# > 0 )); do
             break
             ;;
         -*)
-            echo "unknown flag $1" >&2
+            echo "error: unknown flag $1" >&2
             usage >&2
-            exit 1
+            exit 2
             ;;
         *)
             break
@@ -44,16 +40,30 @@ while (( $# > 0 )); do
     shift
 done
 
-if [[ $editor = yes ]]; then
+if [[ -n $editor ]]; then
     # editor mode, verify that we have at least one fixup/squash command
-    good=no
-    while read -r LINE; do
-        if [[ "$LINE" == "fixup " || "$LINE" == "squash " ]]; then
-            good=yes
-        fi
-        printf "%s\n" "$LINE"
-    done
-    if [[ $good = no ]]; then
+    file=$1
+    if [[ -z $file ]]; then
+        echo "error: expected file argument" >&2
+        exit 1
+    fi
+    if [[ ! -f $file ]]; then
+        echo "error: file '$file' not found" >&2
+        exit 1
+    fi
+    if ! recipe=$(< "$file"); then
+        echo "error: failed to read file '$file'" >&2
+        exit 1
+    fi
+    good=
+    while read -r action _; do
+        case $action in
+            fixup|squash)
+                good=yes
+                ;;
+        esac
+    done <<<"$recipe"
+    if [[ -z $good ]]; then
         echo "No fixup/squash instructions found; is the commit correct?" >&2
         exit 1
     fi
@@ -67,4 +77,4 @@ fi
 
 commit=$1
 
-exec git -c core.editor='git-rebase-noninteractive --editor' rebase -i "$commit"
+exec git -c core.editor='git-rebase-noninteractive --editor' rebase -i --autosquash "$commit"

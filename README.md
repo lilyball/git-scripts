@@ -69,7 +69,9 @@ description. Requires [`jq`][jq]. See `git merge-pr -h` for details.
 
 ### `git-noninteractive`
 
-This is a work in progress. I don't think it works at the moment.
+Performs a `git rebase -i --autosquash` without invoking the editor. The
+intended usage is to automatically apply any `git commit --fixup` or `git commit
+--squash` commits. See `git rebase-noninteractive -h` for details.
 
 ### `git-update-branch`
 
