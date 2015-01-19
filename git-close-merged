@@ -64,9 +64,6 @@ while (( $# > 0 )); do
     shift
 done
 
-test -t 1
-test -t 1 && colorFlags=-f || colorFlags=
-
 mainline=${1-HEAD}
 [[ -n $mainline ]] || die 2 "mainline branch cannot be ''" "$(usage)"
 (( $# <= 1 )) || die 2 "expected at most 1 parameter, found $#" "$(usage)"
@@ -99,7 +96,7 @@ process_ref() {
 
     local notes=()
     local output=
-    local remote= remoteref=
+    local remote='' remoteref=''
 
     local colorFlags=
     test -t 1 && colorFlags=-f
@@ -152,7 +149,7 @@ process_ref() {
             fi
             if [[ -n $opt_force ]]; then
                 local output=
-                if [[ -n $opt_dry_run ]] || output=$(git push --delete --force-with-lease="$remoteref":"$upstreamcommit" "$remote" "$remoteref" 2>&1); then
+                if [[ -n $opt_dry_run ]] || output=$(git push --delete --force-with-lease="$remoteref:$upstreamcommit" "$remote" "$remoteref" 2>&1); then
                     notes+=("$(color $colorFlags reset "deleted upstream " cyan "$upstreamname" reset)")
                     [[ -n $output ]] && notes+=("$output")
                 else
@@ -176,8 +173,8 @@ process_ref() {
 
     fi
 
-    # shellcheck disable=SC2069
     local output=
+    # shellcheck disable=SC2069
     if [[ -n $opt_dry_run ]] || output=$(git update-ref -m 'git close-merged' -d "$ref" "$commit" 2>&1 >/dev/null); then
         if [[ -n $opt_dry_run ]]; then
             color yellow "dry run" reset
