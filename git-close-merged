@@ -23,7 +23,7 @@ usage() {
     echo "  MAINLINE's upstream branch (if set)."
 }
 
-opt_force=
+opt_force=0
 opt_upstream=
 opt_dry_run=
 
@@ -40,7 +40,7 @@ while (( $# > 0 )); do
             exit
             ;;
         -f|--force)
-            opt_force=yes
+            let ++opt_force
             ;;
         -u|--upstream)
             opt_upstream=yes
@@ -87,6 +87,18 @@ if [[ -n $mainlineupstream ]]; then
         mainlineupstream=
     fi
 fi
+
+# Takes a fully-qualified upstream refname, such as 'refs/heads/develop'
+# exits with 0 if the ref should require extra forcing to delete, to avoid
+# accidentally deleting important refs like 'develop' and 'master'.
+function upstream_ref_requires_force() {
+    case $1 in
+        refs/heads/develop|refs/heads/master)
+            return 0
+            ;;
+    esac
+    return 1
+}
 
 result=0
 process_ref() {
@@ -147,7 +159,16 @@ process_ref() {
                 color red "error:" reset " failed to retrieve upstream branch information"
                 return
             fi
-            if [[ -n $opt_force ]]; then
+            if (( opt_force == 0 )); then
+                color yellow "abort" reset
+                color yellow "warning:" reset " pass -f to delete upstream " cyan "$upstreamname" reset
+                return
+            elif (( opt_force == 1 )) && upstream_ref_requires_force "$remoteref"; then
+                color yellow "abort" reset
+                color yellow "warning:" reset " upstream " cyan "$upstreamname" reset " looks like a permanent branch"
+                echo "         pass -f -f to delete anyway"
+                return
+            else
                 local output=
                 if [[ -n $opt_dry_run ]] || output=$(git push --delete --force-with-lease="$remoteref:$upstreamcommit" "$remote" "$remoteref" 2>&1); then
                     notes+=("$(color $colorFlags reset "deleted upstream " cyan "$upstreamname" reset)")
@@ -159,10 +180,6 @@ process_ref() {
                     result=1
                     return
                 fi
-            else
-                color yellow "abort" reset
-                color yellow "warning:" reset " pass -f to delete upstream " cyan "$upstreamname" reset
-                return
             fi
         elif (( opt_force == 0 )); then
             color yellow "abort" reset
