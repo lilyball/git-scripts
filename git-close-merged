@@ -147,6 +147,11 @@ process_ref() {
                 color yellow "warning:" reset " upstream " cyan "$upstreamname" reset " contains unmerged commits"
                 return
             fi
+            if [[ $upstream == "$mainlineupstream" ]]; then
+                color yellow "abort" reset
+                color yellow "warning:" reset " upstream " cyan "$upstreamname" reset " matches upstream for mainline " cyan "$mainlinename"
+                return
+            fi
             # the remote used for the tracking branch comes from the config
             # branch.<branch>.remote.
             # Similarly the remote refspec is branch.<branch>.merge.
