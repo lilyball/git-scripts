@@ -3,7 +3,7 @@
 . "${BASH_SOURCE[0]%/*}"/utils.bash
 
 usage() {
-    echo "Usage: git close-merged [-f] [-u] [-n] [MAINLINE]"
+    echo "Usage: git close-merged [-fun] [MAINLINE]"
     echo
     echo "Options:"
     echo "  -h --help      Displays this help."
@@ -29,6 +29,12 @@ opt_dry_run=
 
 while (( $# > 0 )); do
     case "$1" in
+        -[^-]?*)
+            flag=$1
+            shift
+            set -- "${flag:0:2}" -"${flag:2}" "$@"
+            continue
+            ;;
         -h|--help)
             usage full
             exit
