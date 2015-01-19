@@ -1,4 +1,13 @@
+#!/bin/bash
+
 # utilities for the git scripts
+
+if (( ${#BASH_SOURCE[@]} <= 1 )) && [[ $- != *i* ]]; then
+    echo "utils.bash is not an executable script" >&2
+    echo "source it from your other scripts with:" >&2
+    echo "  . \"\${BASH_SOURCE[0]%/*}\"/utils.bash" >&2
+    exit 1
+fi
 
 # Usage:
 #   die
@@ -41,7 +50,7 @@ die() {
 # Prints the fatal message and returns (not exits) with 128. Callers
 # are expected to then return themselves.
 fatal() {
-    local name= msg= error=
+    local name='' msg='' error=''
     if [[ $1 == -f ]]; then
         name=${FUNCNAME[1]}
         shift
@@ -51,15 +60,18 @@ fatal() {
             declare -i n=$1
             shift
             if (( n < 0 )); then
+                # shellcheck disable=SC2016
                 error='`fatal` flag -n parameter must be non-negative'
             else
                 name=${FUNCNAME[$n+1]-unknown}
             fi
         else
+            # shellcheck disable=SC2016
             error='expected parameter to `fatal` flag -n'
         fi
     fi
     if (( $# == 0 )); then
+        # shellcheck disable=SC2016
         error='expected parameter to `fatal`'
     fi
     if [[ -z $error ]]; then
@@ -167,7 +179,7 @@ set_color() {
 utils_color_cache_key=()
 utils_color_cache_value=()
 color() {
-    local newline=yes tty= config=
+    local newline=yes tty='' config=''
     [[ -t 1 ]] && tty=yes
     while (( $# > 0 )); do
         case $1 in
@@ -212,6 +224,7 @@ color() {
             config=$2
             shift 2
         fi
+        # shellcheck disable=SC2086
         [[ -n $color ]] && set_color ${config:+"$config"} "$1"
         shift
         (( $# == 0 )) && break
@@ -244,7 +257,7 @@ color() {
 # Example:
 #   print_lines -h note -c yellow "$text"
 print_lines() {
-    local header= color= indent=yes flags=()
+    local header='' color='' indent=yes flags=()
     while (( $# > 0 )); do
         case $1 in
             -h)
@@ -277,7 +290,7 @@ print_lines() {
                     printf '%s: %s\n' "$header" "$line"
                 fi
                 first=
-                [[ -n $indent ]] && header="${header//?/ }  " || header=
+                if [[ -n $indent ]]; then header="${header//?/ }  "; else header=''; fi
             else
                 printf '%s%s\n' "$header" "$line"
             fi
