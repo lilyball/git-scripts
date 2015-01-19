@@ -164,7 +164,7 @@ process_ref() {
                 color yellow "warning:" reset " pass -f to delete upstream " cyan "$upstreamname" reset
                 return
             fi
-        else
+        elif (( opt_force == 0 )); then
             color yellow "abort" reset
             color yellow "warning:" reset " upstream " cyan "$upstreamname" reset " still exists"
             echo "         pass -u to delete upstream or -f to force"
@@ -198,7 +198,7 @@ eval "$(git for-each-ref --shell --format='
 
 if [[ $result == 0 ]]; then
     if [[ -n $opt_dry_run ]]; then
-        echo -n '[dry run] '
+        color -n yellow '[dry run]' reset ' '
     fi
     echo "All merged branches have been closed"
 else
