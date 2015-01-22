@@ -53,9 +53,7 @@ while (( $# > 0 )); do
             break
             ;;
         -*)
-            echo "unknown flag $1" >&2
-            usage >&2
-            exit 1
+            die 2 "unknown flag $1" "$(usage)"
             ;;
         *)
             break
