@@ -3,10 +3,13 @@
 . "${BASH_SOURCE[0]%/*}"/utils.bash
 
 usage() {
-    echo "Usage: git close-current-branch [MAINLINE]"
+    echo "Usage: git close-current-branch [-fun] [MAINLINE]"
     echo
     echo "Options:"
-    echo "  -h --help  Displays this help."
+    echo "  -h --help      Displays this help."
+    echo "  -f --force     Close the branch even if upstream exists."
+    echo "  -u --upstream  Close the upstream branch."
+    echo "  -n --dry-run   Don't actually make any changes."
     [[ -z $1 ]] && return
     echo
     echo "Description:"
@@ -15,7 +18,8 @@ usage() {
     echo "  if not given as an argument, with 'develop' as the default if unset."
     echo
     echo "  This script is intended to be used after a pull request is merged and the"
-    echo "  remote branch is closed."
+    echo "  remote branch is closed. If the remote branch isn't closed, the -u"
+    echo "  flag can be used to close it, or the -f flag can be used to ignore it."
     echo
     echo "Example:"
     echo "  > git fetch && git close-current-branch"
@@ -31,11 +35,29 @@ detectMainline() {
     printf "%s\n" "$branch"
 }
 
+opt_force=0
+opt_upstream=0
+opt_dry_run=0
 while (( $# > 0 )); do
     case "$1" in
+        -[^-]?*)
+            flag=$1
+            shift
+            set -- "${flag:0:2}" "-${flag:2}" "$@"
+            continue
+            ;;
         -h|--help)
             usage full
             exit
+            ;;
+        -f|--force)
+            opt_force=1
+            ;;
+        -u|--upstream)
+            opt_upstream=1
+            ;;
+        -n|--dry-run)
+            opt_dry_run=1
             ;;
         --)
             shift
@@ -82,6 +104,9 @@ eval "$(git for-each-ref --count=1 --shell --format='
 test -n "$ref" || die "no such branch '$mainline'"
 test "$ref" != "$HEAD" || die "$refname is currently checked out"
 
+msg_suffix=()
+(( opt_dry_run )) && msg_suffix=(yellow " [dry run]" reset)
+
 if ! git merge-base --is-ancestor "$HEADcommit" "$commit"; then
     # mainline does not contain our branch
     test -n "$upstream" || die "$refname does not contain HEAD"
@@ -99,12 +124,31 @@ if ! git merge-base --is-ancestor "$HEADcommit" "$commit"; then
     git update-ref -m "git close-current-branch" "$ref" "$upstreamcommit" "$commit" || exit
 fi
 
-color magenta "Checking out " cyan "$refname" reset "..."
-git checkout "$refname" || exit
-
-color magenta "Deleting " cyan "$HEADname" reset "..."
-git update-ref -m "git close-current-branch" -d "$HEAD" "$HEADcommit" || exit
-
-if test -n "$HEADupstream" && git rev-parse --quiet --verify "$HEADupstream" >/dev/null; then
-    color yellow "warning:" reset " upstream " cyan "$HEADupstreamname" reset " still exists" >&2
+if [[ -n $HEADupstream ]] && git rev-parse --quiet --verify "$HEADupstream" >/dev/null; then
+    if (( opt_upstream )); then
+        HEADupstreamcommit=$(git rev-parse --verify "$HEADupstream") || exit
+        if ! git merge-base --is-ancestor "$HEADupstreamcommit" "$HEADcommit"; then
+            color red "error:" reset " upstream " cyan "$HEADupstreamname" reset " contains commits not found in " cyan "$HEADname" reset
+            exit 1
+        fi
+        color magenta "Deleting" reset " upstream " cyan "$HEADupstreamname" reset "..." "${msg_suffix[@]}"
+        if (( ! opt_dry_run )); then
+            remote=$(git config --get branch."$HEADname".remote 2>/dev/null) \
+                remoteref=$(git config --get branch."$HEADname".merge 2>/dev/null) ||
+                die "failed to retrieve upstream branch information"
+            git push --delete --force-with-lease="$remoteref:$HEADupstreamcommit" "$remote" "$remoteref" 2>&1 || exit
+        fi
+    elif (( opt_force )); then
+        color yellow "warning:" reset " ignoring upstream " cyan "$HEADupstreamname" reset
+    else
+        color yellow "abort:" reset " upstream " cyan "$HEADupstreamname" reset " still exists"
+        echo "       pass -u to delete or -f to ignore"
+        exit 1
+    fi
 fi
+
+color magenta "Checking out " cyan "$refname" reset "..." "${msg_suffix[@]}"
+(( opt_dry_run )) || { git checkout "$refname" || exit; }
+
+color magenta "Deleting " cyan "$HEADname" reset "..." "${msg_suffix[@]}"
+(( opt_dry_run )) || { git update-ref -m "git close-current-branch" -d "$HEAD" "$HEADcommit" || exit; }
