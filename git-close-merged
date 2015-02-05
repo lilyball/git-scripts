@@ -184,7 +184,9 @@ process_ref() {
                     return
                 fi
             fi
-        elif (( opt_force == 0 )); then
+        elif (( opt_force )); then
+            notes+=("$(color $colorFlags reset "ignoring upstream " cyan "$upstreamname" reset)")
+        else
             color yellow "abort" reset
             color yellow "warning:" reset " upstream " cyan "$upstreamname" reset " still exists"
             echo "         pass -u to delete upstream or -f to force"
