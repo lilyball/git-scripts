@@ -8,6 +8,7 @@ usage() {
     echo
     echo "Options:"
     echo "  -h --help  Displays this help."
+    echo "  -g --gui   Use gvim instead of vim."
     echo
     echo "Arguments:"
     echo "  REV   The revision to show."
@@ -69,11 +70,21 @@ abspath() {
     printf "%s\n" "$result"
 }
 
+cmd=vim
 while (( $# > 0 )); do
     case $1 in
+        -[^-]?*)
+            flag=$1
+            shift
+            set -- "${flag:0:2}" -"${flag:2}" "$@"
+            continue
+            ;;
         -h|--help)
             usage full
             exit
+            ;;
+        -g|--gui)
+            cmd=gvim
             ;;
         --)
             # we don't allow -- before REV
@@ -90,6 +101,7 @@ while (( $# > 0 )); do
             break
             ;;
     esac
+    shift
 done
 
 REV=$1
@@ -117,4 +129,4 @@ if [[ -n "$FILE" ]]; then
     path+=$(abspath "/$prefix$FILE")
 fi
 
-exec vim "fugitive://${git_dir%/}//$path"
+exec "$cmd" "fugitive://${git_dir%/}//$path"
