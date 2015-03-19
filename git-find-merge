@@ -6,11 +6,12 @@ die() {
 }
 
 usage() {
-    echo "Usage: git find-merge [-o] COMMIT [BRANCH]"
+    echo "Usage: git find-merge [-ob] COMMIT [BRANCH]"
     echo
     echo "Options:"
     echo "  -h --help     Displays this help."
     echo "  -o --oneline  Displays the output as a single line."
+    echo "  -b --bare     Shows just the merge commit."
     #echo "  -a --all"
     echo
     echo "Arguments:"
@@ -25,15 +26,25 @@ usage() {
 
 format=
 #all=no
+opt_bare=
 
 while (( $# != 0 )); do
     case "$1" in
+        -[^-]?*)
+            flag=$1
+            shift
+            set -- "${flag:0:2}" -"${flag:2}" "$@"
+            continue
+            ;;
         -h|--help)
             usage full
             exit 0
             ;;
         -o|--oneline)
             format=oneline
+            ;;
+        -b|--bare)
+            opt_bare=yes
             ;;
         #-a|--all)
             #all=yes
@@ -81,4 +92,8 @@ done <<<"$revs"
 
 [[ -n "$merge" ]] || die "Couldn't find any merge point"
 
-exec git --no-pager log --max-count=1 ${format:+--format="$format"} "$merge" --
+if [[ -n $opt_bare ]]; then
+    echo "$merge"
+else
+    exec git --no-pager log --max-count=1 ${format:+--format="$format"} "$merge" --
+fi
