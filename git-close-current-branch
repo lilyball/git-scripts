@@ -84,7 +84,7 @@ test -n "$mainline" || die "unknown branch '$mainline'"
 
 HEAD=$(git rev-parse --revs-only --symbolic-full-name HEAD --) || exit
 test "$HEAD" != "HEAD" || die "detached HEAD"
-HEADcommit=
+HEADname='' HEADcommit='' HEADupstream='' HEADupstreamname='' # suppress shellcheck warnings
 eval "$(git for-each-ref --count=1 --shell --format='
     HEADname=%(refname:short)
     HEADcommit=%(objectname)
@@ -92,8 +92,9 @@ eval "$(git for-each-ref --count=1 --shell --format='
     HEADupstreamname=%(upstream:short)
 ' -- "$HEAD")"
 test -n "$HEADcommit" || die 3 "couldn't find ref information for HEAD ($HEAD)"
+HEADshort=${HEAD#refs/heads/}
 
-ref=
+ref='' refname='' commit='' upstream='' upstreamname='' # suppress shellcheck warnings
 eval "$(git for-each-ref --count=1 --shell --format='
     ref=%(refname)
     refname=%(refname:short)
@@ -103,6 +104,7 @@ eval "$(git for-each-ref --count=1 --shell --format='
 ' -- "$mainline")"
 test -n "$ref" || die "no such branch '$mainline'"
 test "$ref" != "$HEAD" || die "$refname is currently checked out"
+refshort=${refname#refs/heads/}
 
 msg_suffix=()
 (( opt_dry_run )) && msg_suffix=(yellow " [dry run]" reset)
@@ -133,8 +135,8 @@ if [[ -n $HEADupstream ]] && git rev-parse --quiet --verify "$HEADupstream" >/de
         fi
         color magenta "Deleting" reset " upstream " cyan "$HEADupstreamname" reset "..." "${msg_suffix[@]}"
         if (( ! opt_dry_run )); then
-            remote=$(git config --get branch."$HEADname".remote 2>/dev/null) \
-                remoteref=$(git config --get branch."$HEADname".merge 2>/dev/null) ||
+            remote=$(git config --get branch."$HEADshort".remote 2>/dev/null) \
+                remoteref=$(git config --get branch."$HEADshort".merge 2>/dev/null) ||
                 die "failed to retrieve upstream branch information"
             git push --delete --force-with-lease="$remoteref:$HEADupstreamcommit" "$remote" "$remoteref" 2>&1 || exit
         fi
@@ -152,3 +154,4 @@ color magenta "Checking out " cyan "$refname" reset "..." "${msg_suffix[@]}"
 
 color magenta "Deleting " cyan "$HEADname" reset "..." "${msg_suffix[@]}"
 (( opt_dry_run )) || { git update-ref -m "git close-current-branch" -d "$HEAD" "$HEADcommit" || exit; }
+(( opt_dry_run )) || { git config --remove-section branch."$refshort" &>/dev/null; }

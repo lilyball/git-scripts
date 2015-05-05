@@ -103,6 +103,7 @@ process_ref() {
     local ref=$1 refname=$2 commit=$3
     local upstream=$4 upstreamname=$5 upstreamcommit=
     local ishead=$6
+    local refshort=${refname#refs/heads/}
 
     local notes=()
     local output=
@@ -147,6 +148,7 @@ process_ref() {
             fi
             if [[ $upstream == "$mainlineupstream" ]]; then
                 color yellow "abort" reset
+                # shellcheck disable=SC2154
                 color yellow "warning:" reset " upstream " cyan "$upstreamname" reset " matches upstream for mainline " cyan "$mainlinename"
                 return
             fi
@@ -155,8 +157,8 @@ process_ref() {
             # Similarly the remote refspec is branch.<branch>.merge.
             # Our $upstream is the local remote-tracking branch, but the name may
             # differ from the remote refspec.
-            if ! remote=$(git config --get branch."$refname".remote 2>/dev/null) \
-                 remoteref=$(git config --get branch."$refname".merge 2>/dev/null); then
+            if ! remote=$(git config --get branch."$refshort".remote 2>/dev/null) \
+                 remoteref=$(git config --get branch."$refshort".merge 2>/dev/null); then
                 # we got an upstream before but can't manually retrieve it now?
                 color red "fail" reset
                 color red "error:" reset " failed to retrieve upstream branch information"
@@ -198,6 +200,7 @@ process_ref() {
     local output=
     # shellcheck disable=SC2069
     if [[ -n $opt_dry_run ]] || output=$(git update-ref -m 'git close-merged' -d "$ref" "$commit" 2>&1 >/dev/null); then
+        [[ -n $opt_dry_run ]] || git config --remove-section branch."$refshort" &>/dev/null # clear branch info
         if [[ -n $opt_dry_run ]]; then
             color yellow "dry run" reset
         else
