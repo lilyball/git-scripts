@@ -104,7 +104,6 @@ eval "$(git for-each-ref --count=1 --shell --format='
 ' -- "$mainline")"
 test -n "$ref" || die "no such branch '$mainline'"
 test "$ref" != "$HEAD" || die "$refname is currently checked out"
-refshort=${refname#refs/heads/}
 
 msg_suffix=()
 (( opt_dry_run )) && msg_suffix=(yellow " [dry run]" reset)
@@ -154,4 +153,4 @@ color magenta "Checking out " cyan "$refname" reset "..." "${msg_suffix[@]}"
 
 color magenta "Deleting " cyan "$HEADname" reset "..." "${msg_suffix[@]}"
 (( opt_dry_run )) || { git update-ref -m "git close-current-branch" -d "$HEAD" "$HEADcommit" || exit; }
-(( opt_dry_run )) || { git config --remove-section branch."$refshort" &>/dev/null; }
+(( opt_dry_run )) || { git config --remove-section branch."$HEADshort" &>/dev/null; }
