@@ -66,6 +66,13 @@ get_pullreq_info() {
     PR_OWNER=$4
     PR_REF=$5
     PR_CLONE_URL=$6
+    if [[ -z $PR_CLONE_URL ]]; then
+        output=$(jq -r -e '.message // ""' <<< "$json")
+        if [[ -n $output ]]; then
+            color red "API error:" reset " $output"
+        fi
+        return 1
+    fi
 }
 
 opt_edit=yes
@@ -100,5 +107,6 @@ message="Merge pull request #$PR_NUM from $PR_OWNER/$PR_REF"
 [[ -n $PR_TITLE ]] && message+=$'\n\n'"$PR_TITLE"
 [[ -n $PR_BODY ]] && message+=$'\n\n'"$PR_BODY"
 
+color reset "Fetching PR " magenta "$PR_CLONE_URL" reset " ref " cyan "$PR_REF" reset
 git fetch "$PR_CLONE_URL" "$PR_REF" || die "fetch failed"
 git merge --no-ff -m "$message" ${opt_edit:+--edit} --no-log FETCH_HEAD || die "merge failed"
