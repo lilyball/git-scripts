@@ -65,9 +65,14 @@ for details.
 Merges a GitHub pull request locally using the pull request title and
 description. Requires [`jq`][jq]. See `git merge-pr -h` for details.
 
+**Note:** This does not work for private repos at this time.
+
 [jq]: http://stedolan.github.io/jq/
 
 ### `git-noninteractive`
+
+**Note:** This script seems somewhat broken. It only works some of the time. I
+haven't investigated it yet.
 
 Performs a `git rebase -i --autosquash` without invoking the editor. The
 intended usage is to automatically apply any `git commit --fixup` or `git commit
