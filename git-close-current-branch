@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# shellcheck source=/dev/null
 . "${BASH_SOURCE[0]%/*}"/utils.bash
 
 usage() {
@@ -15,7 +16,7 @@ usage() {
     echo "Description:"
     echo "  Closes the current branch if it's been merged into the mainline."
     echo "  The config key close-current-branch.mainline defines the default mainline"
-    echo "  if not given as an argument, with 'develop' as the default if unset."
+    echo "  if not given as an argument, with 'master' as the default if unset."
     echo
     echo "  This script is intended to be used after a pull request is merged and the"
     echo "  remote branch is closed. If the remote branch isn't closed, the -u"
@@ -28,9 +29,9 @@ usage() {
 detectMainline() {
     local branch
     if ! branch=$(git config --get close-current-branch.mainline); then
-        color yellow "warning:" reset " no mainline provided, assuming " cyan "develop" reset >&2
+        color yellow "warning:" reset " no mainline provided, assuming " cyan "master" reset >&2
         color yellow "note:" reset " set config value " yellow "close-current-branch.mainline" reset " to suppress this warning" >&2
-        branch=develop
+        branch=master
     fi
     printf "%s\n" "$branch"
 }
