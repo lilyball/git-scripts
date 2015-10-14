@@ -9,6 +9,7 @@ usage() {
     echo "Options:"
     echo "  -h --help      Displays this help."
     echo "  -f --force     Close the branch even if upstream exists."
+    echo "  -e --fetch     Run git fetch before doing anything else."
     echo "  -u --upstream  Close the upstream branch."
     echo "  -n --dry-run   Don't actually make any changes."
     [[ -z $1 ]] && return
@@ -23,7 +24,7 @@ usage() {
     echo "  flag can be used to close it, or the -f flag can be used to ignore it."
     echo
     echo "Example:"
-    echo "  > git fetch && git close-current-branch"
+    echo "  > git close-current-branch -e"
 }
 
 detectMainline() {
@@ -39,6 +40,7 @@ detectMainline() {
 opt_force=0
 opt_upstream=0
 opt_dry_run=0
+opt_fetch=0
 while (( $# > 0 )); do
     case "$1" in
         -[^-]?*)
@@ -53,6 +55,9 @@ while (( $# > 0 )); do
             ;;
         -f|--force)
             opt_force=1
+            ;;
+        -e|--fetch)
+            opt_fetch=1
             ;;
         -u|--upstream)
             opt_upstream=1
@@ -82,6 +87,11 @@ git rev-parse --git-dir >/dev/null || exit
 [[ -z $mainline ]] && { mainline=$(detectMainline) || exit; }
 mainline=$(git rev-parse --revs-only --symbolic-full-name "$mainline" --) || exit
 test -n "$mainline" || die "unknown branch '$mainline'"
+
+if (( opt_fetch )); then
+    echo "Fetching..."
+    git fetch || exit
+fi
 
 HEAD=$(git rev-parse --revs-only --symbolic-full-name HEAD --) || exit
 test "$HEAD" != "HEAD" || die "detached HEAD"
