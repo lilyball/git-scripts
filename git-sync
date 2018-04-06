@@ -1,0 +1,103 @@
+#!/bin/bash
+
+. "${BASH_SOURCE[0]%/*}"/utils.bash
+
+usage() {
+    echo "Usage: git sync [REMOTE]"
+    echo "       git sync --pre-commit-hook"
+    echo
+    echo "Options:"
+    echo "  -h --help          Displays this help."
+    echo "  --pre-commit-hook  Use pre-commit-hook mode."
+    echo
+    echo "Arguments:"
+    echo "  REMOTE  The remote to sync with. [default: origin]"
+    [[ -z $1 ]] && return
+    echo
+    echo "Description:"
+    echo "  Fetches all branches from the remote and updates all local sync branches"
+    echo "  to match their remotes. If a local sync branch is ahead of its remote, it"
+    echo "  will be skipped, unless it's the checked-out branch. If the checked-out"
+    echo "  branch is a sync branch, it will be updated with git-rebase."
+    echo
+    echo "  By default the only sync branch is 'master'. See configuration for how to"
+    echo "  define additional sync branches."
+    echo
+    echo "Pre-Commit Hook Mode:"
+    echo "  This mode is meant to be used from a pre-commit script. It prevents"
+    echo "  committing to protected branches. This ensures you don't accidentally"
+    echo "  commit to master."
+    echo
+    echo "Configuration:"
+    echo "  git-close-merged.sync-branches:"
+    echo "    A list of branches to automatically update in sync mode and to prevent"
+    echo "    committing to in pre-commit hook mode. 'master' is always considered to"
+    echo "    be a sync branch regardless of this value."
+}
+
+opt_pre_commit_hook_mode=
+
+while (( $# > 0 )); do
+    case "$1" in
+        -h|--help)
+            usage full
+            exit 0
+            ;;
+        --pre-commit-hook)
+            opt_pre_commit_hook_mode=yes
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            die 2 "unknown flag $1" "$(usage)"
+            ;;
+        *)
+            break
+            ;;
+    esac
+    shift
+done
+
+git rev-parse --git-dir >/dev/null || exit
+
+HEAD=$(git rev-parse --revs-only --symbolic-full-name HEAD --) || exit
+
+sync_branches=(refs/heads/master)
+while IFS= read -r branch; do
+    [[ -n "$branch" ]] || continue
+    if longBranch=$(git rev-parse --revs-only --symbolic-full-name "$branch" -- 2>/dev/null); then
+        sync_branches+=("$longBranch")
+    else
+        color yellow "warning:" reset " sync branch " cyan "$branch" reset " does not exist"
+    fi
+done <<<"$(git config --get-all git-close-merged.sync-branches)"
+
+if [[ -n $opt_pre_commit_hook_mode ]]; then
+    # pre-commit hook mode
+    (( $# == 0 )) || die 2 "expected no parameters, found $#" "$(usage)"
+    [[ "$HEAD" != HEAD ]] || exit 0
+    for branch in "${sync_branches[@]}"; do
+        [[ "$HEAD" != "$branch" ]] || die 1 "the checked-out branch is a configured sync branch"
+    done
+    exit 0
+else
+    # sync mode
+    remote=${1-origin}
+    [[ -n "$remote" ]] || die 2 "remote cannot be ''" "$(usage)"
+    (( $# <= 1 )) || die 2 "expected at most 1 parameter, found $#" "$(usage)"
+    shortNames=()
+    longNames=()
+    commits=()
+    shortUpstreams=()
+    longUpstreams=()
+    eval "$(git for-each-ref --shell --format='
+        shortNames+=(%(refname:short))
+        longNames+=(%(refname))
+        commits+=(%(objectname))
+        shortUpstreams+=(%(upstream:short))
+        longUpstreams+=(%(upstream))
+    ' -- "${sync_branches[@]}")"
+    : TODO
+fi
