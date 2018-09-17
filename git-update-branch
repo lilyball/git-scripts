@@ -59,4 +59,4 @@ if ! git rev-parse --verify "$branch@{upstream}" >/dev/null 2>&1; then
     exit 1
 fi
 
-exec git push . +"$branch@{upstream}:$branch"
+exec git push --no-verify . +"$branch@{upstream}:$branch"
