@@ -73,7 +73,7 @@ shift && die "$(usage)" # too many args
 [[ "$branch" == -* ]] && die "bad branch '$branch'"
 
 revs=$(git rev-list --ancestry-path --topo-order --format=%P "$branch" --not "$commit" --) \
-    || die 'command `git rev-list` failed'
+    || die "command 'git rev-list' failed"
 
 merge=
 parent=
@@ -82,7 +82,7 @@ while read -r word sha && [[ "$word" == commit ]]; do
         read -r _ # skip next line
         continue
     fi
-    read -r parent parent2 && [[ -n "$parent" ]] || die "invalid rev-list output"
+    { read -r parent parent2 && [[ -n "$parent" ]]; } || die "invalid rev-list output"
     if [[ -n "$parent2" ]]; then
         merge=$sha
     else

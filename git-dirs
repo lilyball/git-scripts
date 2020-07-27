@@ -52,11 +52,12 @@ done
 
 git rev-parse --git-dir >/dev/null || exit
 
-HEAD=($(git -c core.warnAmbiguousRefs=false rev-parse HEAD --symbolic-full-name HEAD))
+IFS=$'\n' read -r -d '' -a HEAD <<<"$(git -c core.warnAmbiguousRefs=false rev-parse HEAD --symbolic-full-name HEAD)"
 
 for (( i=1; i <= limit; i++ )); do
     printf '@{-%d}: ' "$i"
-    if branch=($(git rev-parse "@{-$i}" --symbolic-full-name "@{-$i}" --abbrev-ref "@{-$i}" 2>/dev/null)); then
+    if rawBranch="$(git rev-parse "@{-$i}" --symbolic-full-name "@{-$i}" --abbrev-ref "@{-$i}" 2>/dev/null)"; then
+        IFS=$'\n' read -r -d '' -a branch <<<"$rawBranch"
         if [[ -n ${branch[1]} ]]; then
             config=local color=normal
             if [[ ${HEAD[1]} == "${branch[1]}" ]]; then
@@ -67,7 +68,6 @@ for (( i=1; i <= limit; i++ )); do
             config=plain color=normal
             if [[ ${HEAD[1]} == HEAD && ${branch[0]} == "${HEAD[0]}" ]]; then
                 config=current color=green
-                (( useColor )) && git config --get-color color.branch.current green
             fi
             msg="(detached from $(git rev-parse --short "${branch[0]}"))"
             color -b color.branch -c color.branch."$config" "$color" "$msg" reset

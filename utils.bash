@@ -224,7 +224,6 @@ color() {
             config=$2
             shift 2
         fi
-        # shellcheck disable=SC2086
         [[ -n $color ]] && set_color ${config:+"$config"} "$1"
         shift
         (( $# == 0 )) && break

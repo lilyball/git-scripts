@@ -23,7 +23,7 @@ while (( $# > 0 )); do
             exit
             ;;
         --editor)
-            editor=yes
+            opt_editor=yes
             ;;
         --)
             shift
@@ -40,7 +40,7 @@ while (( $# > 0 )); do
     shift
 done
 
-if [[ -n $editor ]]; then
+if [[ -n $opt_editor ]]; then
     # editor mode, verify that we have at least one fixup/squash command
     file=$1
     if [[ -z $file ]]; then

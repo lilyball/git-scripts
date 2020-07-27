@@ -41,7 +41,7 @@ while (( $# > 0 )); do
             exit
             ;;
         -f|--force)
-            let ++opt_force
+            (( ++opt_force ))
             ;;
         -u|--upstream)
             opt_upstream=yes
