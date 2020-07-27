@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# shellcheck source=./utils.bash
 . "${BASH_SOURCE[0]%/*}"/utils.bash
 
 usage() {

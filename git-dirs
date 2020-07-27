@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# shellcheck source=./utils.bash
 source "${BASH_SOURCE[0]%/*}"/utils.bash
 
 # git rev-parse will bail on the first `@{-1}` syntax that refers to a deleted branch.
