@@ -89,10 +89,10 @@ fi
 
 # Takes a fully-qualified upstream refname, such as 'refs/heads/develop'
 # exits with 0 if the ref should require extra forcing to delete, to avoid
-# accidentally deleting important refs like 'develop' and 'master'.
+# accidentally deleting important refs like 'develop' and 'main'.
 function upstream_ref_requires_force() {
     case $1 in
-        refs/heads/develop|refs/heads/master)
+        refs/heads/develop|refs/heads/master|refs/heads/main)
             return 0
             ;;
     esac

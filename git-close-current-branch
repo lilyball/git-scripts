@@ -17,7 +17,7 @@ usage() {
     echo "Description:"
     echo "  Closes the current branch if it's been merged into the mainline."
     echo "  The config key close-current-branch.mainline defines the default mainline"
-    echo "  if not given as an argument, with 'master' as the default if unset."
+    echo "  if not given as an argument, with 'main' or 'master' as the default if unset."
     echo
     echo "  This script is intended to be used after a pull request is merged and the"
     echo "  remote branch is closed. If the remote branch isn't closed, the -u"
@@ -30,9 +30,13 @@ usage() {
 detectMainline() {
     local branch
     if ! branch=$(git config --get close-current-branch.mainline); then
-        color yellow "warning:" reset " no mainline provided, assuming " cyan "master" reset >&2
+        # check if we can find a master or main branch in order to pick our default.
+        git rev-parse -q --verify refs/heads/master >/dev/null \
+        && ! git rev-parse -q --verify refs/heads/main >/dev/null \
+        && branch=refs/heads/master \
+        || branch=refs/heads/main
+        color yellow "warning:" reset " no mainline provided, assuming " cyan "$branch" reset >&2
         color yellow "note:" reset " set config value " yellow "close-current-branch.mainline" reset " to suppress this warning" >&2
-        branch=master
     fi
     printf "%s\n" "$branch"
 }
