@@ -70,7 +70,7 @@ for (( i=1; i <= limit; i++ )); do
                 (( useColor )) && git config --get-color color.branch.current green
             fi
             msg="(detached from $(git rev-parse --short "${branch[0]}"))"
-            color -b color.branch -c color.branch"$config" "$color" "$msg" reset
+            color -b color.branch -c color.branch."$config" "$color" "$msg" reset
         fi
     else
         color -b color.branch red '(deleted branch)' reset
