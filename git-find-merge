@@ -1,7 +1,7 @@
 #!/bin/bash
 
 die() {
-    echo "$@" >&2
+    echo "error:" "$@" >&2
     exit 1
 }
 
@@ -11,8 +11,8 @@ usage() {
     echo "Options:"
     echo "  -h --help     Displays this help."
     echo "  -o --oneline  Displays the output as a single line."
-    echo "  -b --bare     Shows just the merge commit."
-    #echo "  -a --all"
+    echo "  -b --bare     Shows just the merge commit hash."
+    echo "  -a --all      Shows all merges responsible for the commit."
     echo
     echo "Arguments:"
     echo "  COMMIT  The commit to find the merge for."
@@ -21,12 +21,12 @@ usage() {
     echo
     echo "Description:"
     echo "  Finds the oldest merge in the first-parent history of BRANCH that COMMIT"
-    echo "  is reachable from."
+    echo "  is reachable from. If --all is specified, shows all merges (if any) that"
+    echo "  exist between the oldest first-parent merge an COMMIT."
 }
 
-format=
-#all=no
-opt_bare=
+opt_format=
+opt_all=0
 
 while (( $# != 0 )); do
     case "$1" in
@@ -41,14 +41,14 @@ while (( $# != 0 )); do
             exit 0
             ;;
         -o|--oneline)
-            format=oneline
+            opt_format=oneline
             ;;
         -b|--bare)
-            opt_bare=yes
+            opt_format=%H
             ;;
-        #-a|--all)
-            #all=yes
-            #;;
+        -a|--all)
+            opt_all=1
+            ;;
         --)
             shift
             break
@@ -72,28 +72,68 @@ shift && die "$(usage)" # too many args
 [[ "$commit" == -* ]] && die "bad revision '$commit'"
 [[ "$branch" == -* ]] && die "bad branch '$branch'"
 
-revs=$(git rev-list --ancestry-path --topo-order --format=%P "$branch" --not "$commit" --) \
-    || die "command 'git rev-list' failed"
+commitSha=$(git rev-parse --verify "${commit}^{commit}") \
+    || die "'$commit' is not a valid branch or revision"
 
-merge=
-parent=
-while read -r word sha && [[ "$word" == commit ]]; do
-    if ! [[ -z "$parent" || "$parent" == "$sha" ]]; then
-        read -r _ # skip next line
-        continue
-    fi
-    { read -r parent parent2 && [[ -n "$parent" ]]; } || die "invalid rev-list output"
-    if [[ -n "$parent2" ]]; then
-        merge=$sha
-    else
-        merge=
-    fi
+revs=$(git rev-list --ancestry-path --topo-order --format=%P "$branch" --not "$commitSha" --) \
+    || die "command 'git rev-list' failed"
+# The output of this command looks like
+#
+#   commit <SHA>
+#   <SHA> <SHA>...
+#
+# Each commit listed is a child of a previously-listed commit, starting with a child of $commit.
+# However any given commit may not be a child of the previous commit, in the event that multiple
+# children branch from the same parent.
+
+[[ -n "$revs" ]] || die "'$commit' is not reachable from '$branch'"
+
+# sanity-check the rev-list output so we error out if it doesn't match our expectation
+while read -r word sha _; do
+    {
+        [[ "$word" == commit && -n "$sha" ]] \
+        && read -r parent _ \
+        && [[ -n "$parent" ]];
+    } || die "invalid rev-list output"
 done <<<"$revs"
 
-[[ -n "$merge" ]] || die "Couldn't find any merge point"
+# Keep track of the oldest first parent on the ancestry graph.
+oldestFirstParent=
+oldestFirstParentParent2=
+{
+    { read -r _ sha _ && read -r parent _; } || die "internal error" # we know it's non-empty
+    oldestFirstParent=$sha
+    nextFirstParent=$parent
+    while read -r _ sha; do
+        read -r parent parent2 || die "internal error"
+        if [[ "$nextFirstParent" == "$sha" ]]; then
+            # We're on the first-parent history
+            oldestFirstParent=$sha
+            nextFirstParent=$parent
+            oldestFirstParentParent2=$parent2
+        fi
+    done
+} <<<"$revs"
 
-if [[ -n $opt_bare ]]; then
-    echo "$merge"
+[[ "$nextFirstParent" == "$commitSha" ]] && die "'$commit' is on the first-parent history of '$branch'"
+
+no_pager=(--no-pager)
+if (( opt_all )); then
+    # Do another ancestry-path search so we don't have to calculate that ourselves
+    if revs=$(git rev-list --merges --ancestry-path --topo-order "$oldestFirstParent" --not "$commitSha"); then
+        IFS=$'\n' read -d '' -ra merges <<<"$revs"
+        if (( ${#merges} > 1 )); then
+            no_pager=() # use the pager
+        fi
+    else
+        echo "error: couldn't fetch new ancestry path from $oldestFirstParent" >&2
+        # don't fail
+        merges=("$oldestFirstParent")
+    fi
 else
-    exec git --no-pager log --max-count=1 ${format:+--format="$format"} "$merge" --
+    # oldestFirstParent must be a merge
+    [[ -n "$oldestFirstParentParent2" ]] || die "internal error: oldest first parent isn't a merge"
+    merges=("$oldestFirstParent")
 fi
+
+exec git "${no_pager[@]}" show --no-patch ${opt_format:+--format="$opt_format"} "${merges[@]}" --
